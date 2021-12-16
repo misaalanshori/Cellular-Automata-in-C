@@ -1,5 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include "fns.h"
+
+#define CNFG_IMPLEMENTATION
+#include "rawdraw/CNFG.h"
+
+
 #define windowX 768
 #define windowY 640
 
@@ -10,18 +16,19 @@
 #define canvasY 512
 #define multiplier 4
 
-#define CNFG_IMPLEMENTATION
-#include "rawdraw/CNFG.h"
+
 int switchCanvas = 0;
 
+// Canvas A and B for storing the pixels
 uint32_t canvasA[simCanvasX*simCanvasY];
 uint32_t canvasB[simCanvasX*simCanvasY];
 
+// This canvas is for storing the upscaled pixels
 uint32_t canvas4x[canvasX*canvasY];
 
 #define t 0xffffffffL
 
-uint32_t inputCanvas[32*32] = {
+uint32_t inputCanvas[32*32] = { // NOTE: temporary solution, in the future read input from stdin or something.
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, t, 0, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -57,71 +64,18 @@ uint32_t inputCanvas[32*32] = {
 	
 };
 
-// uint32_t inputCanvas[16*16] = {
-// 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, t, 0, 0, 0, 0, 0, 0, 0, 0, t, 0, 0, 0,
-// 	0, 0, 0, 0, t, 0, 0, 0, 0, 0, 0, t, 0, t, 0, 0,
-// 	0, 0, t, t, t, 0, 0, 0, 0, 0, 0, 0, t, 0, 0, 0,
-// 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, t, t, t, t, t, t, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, t, 0, 0, 0, 0, 0, t, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, 0, 0, 0, 0, 0, t, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, t, 0, 0, 0, 0, t, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, 0, t, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	
-// };
-
 #undef t
 
 #define bignum 0xffffffffL
 
-void upscaleCanvasArray(uint32_t source[], int sW, int sH, uint32_t target[], int tW, int tH, int mX, int mY) {
-	for (int cY = 0; cY < sH; cY++)
-	{
-		for (int cX = 0; cX < sW; cX++)
-		{
-			for (int mmX = 0; mmX < mX; mmX++)
-			{
-				for (int mmY = 0; mmY < mY; mmY++)
-				{
-					target[(cX*mX+mmX)+(cY*mY+mmY)*tW] = source[cX+cY*sW];
-					// printf("%d,%d,%lu|", mmX, mmY, source[cX+cY*sW]);
-				}
-				
-			}
-			// printf("\r");
-			
-		}
-	}
-	
-}
-
-void putInArray(uint32_t source[], int sW, int sH, uint32_t target[], int tW, int tH, int x, int y) {
-
-	for (int cY = 0; cY < sH; cY++)
-	{
-		for (int cX = 0; cX < sW; cX++)
-		{
-			target[(cX+x)+(cY+y)*tW] = source[cX+cY*sW];
-
-		}
-		
-	}
-	
-}
-
 void calculateCGOL(uint32_t source[], uint32_t target[], int x, int y) {
 	int totalNeighbors = 0;
+	// Loop through all pixels
 	for (int cY = 0; cY < y; cY++)
 	{
 		for (int cX = 0; cX < x; cX++)
 		{
-			// Calculate the total neighors
+			// Loop Through the neighbors and calculate the total
 			for (int nY = -1; nY <= 1; nY++)
 			{
 				for (int nX = -1; nX <= 1; nX++)
@@ -130,27 +84,24 @@ void calculateCGOL(uint32_t source[], uint32_t target[], int x, int y) {
 						totalNeighbors += 1;
 					}
 				}
-				
 			}
 
-			target[cX+cY*x] = 0;
+			target[cX+cY*x] = 0; // Make sure the current target pixel is 0
+
 			if (source[cX+cY*x] == bignum) {
-				totalNeighbors -= 1;
-				if (totalNeighbors == 3 | totalNeighbors == 2) {
+				totalNeighbors -= 1; // this excludes the current pixel from the neighbor count
+				if (totalNeighbors == 3 | totalNeighbors == 2) { // If has 2/3 neighbors than it stays alive, else it dies
 					target[cX+cY*x] = bignum;
 				} else {
 					target[cX+cY*x] = 0;
 				}
 			} else {
-				if (totalNeighbors == 3) {
+				if (totalNeighbors == 3) { // if total neighbors is 3, set current pixel to alive
 					target[cX+cY*x] = bignum;
 				}
 			}
-
 			totalNeighbors = 0;
-		
 		}
-	
 	}
 }
 
@@ -165,12 +116,8 @@ void HandleKey( int keycode, int bDown )
 	printf( "Key: %d -> %d\n", keycode, bDown );
 
 }
-void HandleButton( int x, int y, int button, int bDown ) {
-
- }	
-void HandleMotion( int x, int y, int mask ) {
-
-}
+void HandleButton( int x, int y, int button, int bDown ) { }	
+void HandleMotion( int x, int y, int mask ) { }
 void HandleDestroy() { }
 
 
@@ -182,8 +129,9 @@ int cvX = 0;
 int cvY = 0;
 int main() {
     CNFGSetup( "Hello World", windowX, windowY );
+	// Puts the input array to the main canvas (canvas)
 	putInArray(inputCanvas, 32, 32, canvasA, simCanvasX, simCanvasY, 0 , 0);
-	putInArray(inputCanvas, 32, 32, canvasA, simCanvasX, simCanvasY, 32 , 32);
+	putInArray(inputCanvas, 32, 32, canvasA, simCanvasX, simCanvasY, 80 , 80);
     while(CNFGHandleInput())
 	{
         CNFGBGColor = 0x3333bbff; //Dark Blue Background
@@ -212,20 +160,14 @@ int main() {
 			loop = 0;
 		}
 		loop++;
-		// if (switchCanvas == 0) {
-		// 	CNFGBlitImage(canvasB, 0, 0, simCanvasX, simCanvasY);
-		// } else {
 
-		// 	CNFGBlitImage(canvasA, 0, 0, simCanvasX, simCanvasY);
-		// }
-
+		// Calculates where the canvas should be for it to be centered
 		if (w > canvasX) {
 			cvX = (w - canvasX)/2;
 		} else cvX = 0;
 		if (h > canvasY) {
 			cvY = (h - canvasY)/2;
 		} else cvY = 0;
-
 
 		CNFGBlitImage(canvas4x, cvX, cvY, 512, 512);
 		//Display the image and wait for time to display next frame.
