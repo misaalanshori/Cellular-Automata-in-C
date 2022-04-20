@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "fns.h"
+#include <time.h>
 
 #define CNFG_IMPLEMENTATION
 #include "rawdraw/CNFG.h"
@@ -16,8 +17,13 @@
 #define canvasY 512
 #define multiplier 4
 
-
 int switchCanvas = 0;
+
+int buttonDown = 0;
+
+int loop = 0;
+int cvX = 0;
+int cvY = 0;
 
 // Canvas A and B for storing the pixels
 uint32_t canvasA[simCanvasX*simCanvasY];
@@ -90,7 +96,7 @@ void calculateCGOL(uint32_t source[], uint32_t target[], int x, int y) {
 
 			if (source[cX+cY*x] == bignum) {
 				totalNeighbors -= 1; // this excludes the current pixel from the neighbor count
-				if (totalNeighbors == 3 | totalNeighbors == 2) { // If has 2/3 neighbors than it stays alive, else it dies
+				if (totalNeighbors == 3 || totalNeighbors == 2) { // If has 2/3 neighbors than it stays alive, else it dies
 					target[cX+cY*x] = bignum;
 				} else {
 					target[cX+cY*x] = 0;
@@ -117,49 +123,44 @@ void HandleKey( int keycode, int bDown )
 
 }
 void HandleButton( int x, int y, int button, int bDown ) { }	
-void HandleMotion( int x, int y, int mask ) { }
+void HandleMotion( int x, int y, int mask ) { 
+	if (mask == 1 && (x >= cvX && x < cvX + canvasX) && (y >= cvY && y < cvY + canvasY)) {
+		canvasA[((x - cvX)/multiplier) + ((y - cvY)/multiplier) * simCanvasX] = bignum;
+	}
+}
 void HandleDestroy() { }
 
 
 
-int buttonDown = 0;
-
-int loop = 0;
-int cvX = 0;
-int cvY = 0;
 int main() {
-    CNFGSetup( "Hello World", windowX, windowY );
+    CNFGSetup("Conway's Game of Life", windowX, windowY );
 	// Puts the input array to the main canvas (canvas)
 	putInArray(inputCanvas, 32, 32, canvasA, simCanvasX, simCanvasY, 0 , 0);
 	putInArray(inputCanvas, 32, 32, canvasA, simCanvasX, simCanvasY, 80 , 80);
+
+	uint32_t (*workCanvas)[simCanvasX*simCanvasY];
+	uint32_t (*drawCanvas)[simCanvasX*simCanvasY];
+	uint32_t (*tempCanvasP)[simCanvasX*simCanvasY];
+	workCanvas = &canvasA;
+	drawCanvas = &canvasB;
+
     while(CNFGHandleInput())
 	{
         CNFGBGColor = 0x3333bbff; //Dark Blue Background
 
 		short w, h;
-		// CNFGClearFrame();
 		CNFGGetDimensions( &w, &h );
 
-		//Change color to white.
 		CNFGColor( 0xffbbaaff ); 
 		CNFGClearFrame();
 
-		// Run every 30 loops
-		if (loop == 30){
-			// printf("Calculate\n");
-			if (switchCanvas == 0) {
-				calculateCGOL(canvasA, canvasB, simCanvasX, simCanvasY);
-				switchCanvas = 1;
-				upscaleCanvasArray(canvasB, simCanvasX, simCanvasY, canvas4x, canvasX, canvasY, multiplier, multiplier);
-				
-			} else {
-				calculateCGOL(canvasB, canvasA, simCanvasX, simCanvasY);
-				switchCanvas = 0;
-				upscaleCanvasArray(canvasA, simCanvasX, simCanvasY, canvas4x, canvasX, canvasY, multiplier, multiplier);
-			}
-			loop = 0;
+		if (clock() % 20 <= 2){
+			calculateCGOL(*workCanvas, *drawCanvas, simCanvasX, simCanvasY);
+			upscaleCanvasArray(*drawCanvas, simCanvasX, simCanvasY, canvas4x, canvasX, canvasY, multiplier, multiplier);
+			tempCanvasP = workCanvas;
+			workCanvas = drawCanvas;
+			drawCanvas = tempCanvasP;
 		}
-		loop++;
 
 		// Calculates where the canvas should be for it to be centered
 		if (w > canvasX) {
